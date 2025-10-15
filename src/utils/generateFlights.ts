@@ -137,7 +137,8 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
     const airline = rng.choice(airlines);
     const remoteStation = rng.choice(remoteStations);
     const serviceType = rng.choice(serviceTypes);
-    const flightNumber = rng.nextInt(flightNumberMin, flightNumberMax);
+    const arrivalFlightNumber = rng.nextInt(flightNumberMin, flightNumberMax - 1); // Leave room for +1
+    const departureFlightNumber = arrivalFlightNumber + 1; // DEP is ARR + 1
     const registration = rng.choice(registrations);
     const flightSuffix = 'O'; // Default suffix
     
@@ -180,7 +181,7 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
     // Create ARR flight (XXX -> HOME)
     const arrFlight: Flight = {
       'Airline': airline,
-      'Operator Flight Number': flightNumber,
+      'Operator Flight Number': arrivalFlightNumber,
       'Flight Suffix': flightSuffix,
       'Station': `${remoteStation}-${homeAirport}`,
       'STAD': formatDate(arrivalTime),
@@ -196,7 +197,7 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
     // Create DEP flight (HOME -> XXX)
     const depFlight: Flight = {
       'Airline': airline,
-      'Operator Flight Number': flightNumber,
+      'Operator Flight Number': departureFlightNumber,
       'Flight Suffix': flightSuffix,
       'Station': `${homeAirport}-${remoteStation}`,
       'STAD': formatDate(departureTime),
