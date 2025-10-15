@@ -207,7 +207,22 @@ export function buildLinkedRowsFromDaily(
   const linked: LinkedRow[] = [];
 
   for (const arr of arrivals) {
-    const candidates = departuresByKey.get(arr.key);
+    // Extract components from arrival key to build departure key
+    // ARR key format: ${reg}|${flc}|${fln}|${flx}|${remote}
+    const arrKeyParts = arr.key.split('|');
+    if (arrKeyParts.length !== 5) {
+      stats.skippedArr++;
+      continue;
+    }
+    
+    const [reg, flc, flnStr, flx, remote] = arrKeyParts;
+    const arrFln = parseInt(flnStr, 10);
+    
+    // Departure flight number should be ARR + 1
+    const depFln = arrFln + 1;
+    const depKey = `${reg}|${flc}|${depFln}|${flx}|${remote}`;
+    
+    const candidates = departuresByKey.get(depKey);
     if (!candidates || candidates.length === 0) {
       stats.skippedArr++;
       continue;
