@@ -52,24 +52,6 @@ function randomInt(min: number, max: number): number {
 }
 
 /**
- * Check if station is ARR (XXX-HOME)
- */
-function isArrival(station: string, home: string): boolean {
-  const parts = station.split('-').map(p => p.trim().toUpperCase());
-  if (parts.length !== 2) return false;
-  return parts[1] === home.toUpperCase();
-}
-
-/**
- * Check if station is DEP (HOME-XXX)
- */
-function isDeparture(station: string, home: string): boolean {
-  const parts = station.split('-').map(p => p.trim().toUpperCase());
-  if (parts.length !== 2) return false;
-  return parts[0] === home.toUpperCase();
-}
-
-/**
  * Extract origin and destination from station
  */
 function extractOriginDestination(
