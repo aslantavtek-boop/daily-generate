@@ -2,6 +2,7 @@ import { utils, writeFile } from 'xlsx';
 import dayjs from 'dayjs';
 import { Flight } from '../types/flight';
 import { LinkedRow } from './linkFromDaily';
+import { AutoLinkedRow } from './autoLinkFromDaily';
 
 /**
  * Export daily flights to Excel (long format)
@@ -60,6 +61,44 @@ export function exportLinkedFlights(linkedRows: LinkedRow[], filename?: string):
 
   const timestamp = dayjs().format('YYYYMMDD_HHmmss');
   const outputFilename = filename || `linked_flights_${timestamp}_${linkedRows.length}.xlsx`;
+  
+  writeFile(wb, outputFilename);
+}
+
+/**
+ * Export auto-linked flights to Excel (wide format, no matching)
+ */
+export function exportAutoLinkedFlights(autoLinkedRows: AutoLinkedRow[], filename?: string): void {
+  if (autoLinkedRows.length === 0) {
+    throw new Error('No auto-linked flights to export');
+  }
+
+  // Ensure column order is exactly as specified
+  const header = [
+    'ARR_FLC', 'ARR_FLN', 'ARR_FLX', 'ARR_SDT', 'ARR_STA', 'REG',
+    'DEP_FLC', 'DEP_FLN', 'DEP_FLX', 'DEP_SDT', 'DEP_STD'
+  ];
+
+  const exportData = autoLinkedRows.map(row => ({
+    'ARR_FLC': row.ARR_FLC,
+    'ARR_FLN': row.ARR_FLN,
+    'ARR_FLX': row.ARR_FLX,
+    'ARR_SDT': row.ARR_SDT,
+    'ARR_STA': row.ARR_STA,
+    'REG': row.REG,
+    'DEP_FLC': row.DEP_FLC,
+    'DEP_FLN': row.DEP_FLN,
+    'DEP_FLX': row.DEP_FLX,
+    'DEP_SDT': row.DEP_SDT,
+    'DEP_STD': row.DEP_STD,
+  }));
+
+  const ws = utils.json_to_sheet(exportData, { header });
+  const wb = utils.book_new();
+  utils.book_append_sheet(wb, ws, 'AutoLinked');
+
+  const timestamp = dayjs().format('YYYYMMDD_HHmmss');
+  const outputFilename = filename || `auto_linked_flights_${timestamp}_${autoLinkedRows.length}.xlsx`;
   
   writeFile(wb, outputFilename);
 }

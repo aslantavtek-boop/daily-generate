@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import dayjs from 'dayjs';
 import { Flight, FlightGeneratorConfig, TimezoneMode, DistributionMode } from '../../types/flight';
 import { generateFlights, validateConfig } from '../../utils/generateFlights';
-import { exportDailyFlights, exportLinkedFlights } from '../../utils/exporters';
+import { exportDailyFlights, exportLinkedFlights, exportAutoLinkedFlights } from '../../utils/exporters';
 import { buildLinkedRowsFromDaily, DailyRow } from '../../utils/linkFromDaily';
+import { buildAutoLinkedRowsFromDaily, DailyRow as AutoDailyRow } from '../../utils/autoLinkFromDaily';
 
 const DEFAULT_AIRLINES = ['AJ', 'TK', 'PC', 'LH', 'SU', 'QR', 'FZ', 'W6'];
 const DEFAULT_REMOTE_STATIONS = ['BCN', 'IST', 'DOH', 'SAW', 'FRA', 'DXB', 'AMS', 'LHR', 'KWI', 'MUC', 'CDG'];
@@ -290,6 +291,56 @@ export default function FlightGenerator() {
       // Export
       exportLinkedFlights(linked);
       alert(`Successfully exported ${linked.length} linked pairs!\n\n` + message);
+    } catch (error) {
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleExportAutoLink = () => {
+    if (flights.length === 0) {
+      alert('No data to export. Please generate flights first.');
+      return;
+    }
+
+    // Validate home airport
+    const home = homeAirport.trim().toUpperCase();
+    if (home.length !== 3) {
+      alert('Home airport must be exactly 3 letters (IATA code)');
+      return;
+    }
+
+    try {
+      // Convert flights to AutoDailyRow format
+      const dailyRows: AutoDailyRow[] = flights.map(f => ({
+        Airline: f.Airline,
+        'Operator Flight Number': f['Operator Flight Number'],
+        'Flight Suffix': f['Flight Suffix'],
+        Station: f.Station,
+        SDT: f.SDT,
+        STA: f.STA,
+        STD: f.STD,
+        REG: f.REG,
+      }));
+
+      // Build auto-linked rows (no matching, just format conversion)
+      const { rows, stats } = buildAutoLinkedRowsFromDaily(dailyRows, home);
+
+      // Show statistics
+      const message = [
+        `Total: ${stats.total} flights`,
+        `Arrivals: ${stats.arr}`,
+        `Departures: ${stats.dep}`,
+        stats.skipped > 0 ? `Skipped (invalid format): ${stats.skipped}` : null,
+      ].filter(Boolean).join('\n');
+
+      if (rows.length === 0) {
+        alert('No auto-linked flights could be generated.\n\n' + message);
+        return;
+      }
+
+      // Export
+      exportAutoLinkedFlights(rows);
+      alert(`Successfully exported ${rows.length} auto-linked rows!\n\n` + message);
     } catch (error) {
       alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -795,12 +846,20 @@ export default function FlightGenerator() {
             >
               Download Link (from Daily)
             </button>
+            <button
+              onClick={handleExportAutoLink}
+              disabled={flights.length === 0 || isPosting}
+              className="px-6 py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
+            >
+              Download Auto Link (from Daily)
+            </button>
           </div>
           
           {flights.length > 0 && (
             <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
               <p>💡 <strong>Daily:</strong> Long format (one row per flight)</p>
-              <p>💡 <strong>Link:</strong> Wide format (one row per arrival-departure pair)</p>
+              <p>💡 <strong>Link:</strong> Wide format (matched arrival-departure pairs)</p>
+              <p>💡 <strong>Auto Link:</strong> Wide format (no matching, ARR/DEP separate rows)</p>
             </div>
           )}
         </div>
