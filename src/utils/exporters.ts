@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { Flight } from '../types/flight';
 import { LinkedRow } from './linkFromDaily';
 import { AutoLinkedRow } from './autoLinkFromDaily';
+import { LoadRow } from './buildLoadRows';
 
 /**
  * Export daily flights to Excel (long format)
@@ -99,6 +100,42 @@ export function exportAutoLinkedFlights(autoLinkedRows: AutoLinkedRow[], filenam
 
   const timestamp = dayjs().format('YYYYMMDD_HHmmss');
   const outputFilename = filename || `auto_linked_flights_${timestamp}_${autoLinkedRows.length}.xlsx`;
+  
+  writeFile(wb, outputFilename);
+}
+
+/**
+ * Export load data to Excel
+ */
+export function exportLoadExcel(rows: LoadRow[], filename?: string): void {
+  if (rows.length === 0) {
+    throw new Error('No load rows to export');
+  }
+
+  // Ensure column order is exactly as specified
+  const header = [
+    'Date', 'Operator Flight Number', 'Origin Station', 'Destination Station',
+    'Reg', 'Flight Service Type', 'totalpax', 'child', 'adult'
+  ];
+
+  const exportData = rows.map(row => ({
+    'Date': row.Date,
+    'Operator Flight Number': row['Operator Flight Number'],
+    'Origin Station': row['Origin Station'],
+    'Destination Station': row['Destination Station'],
+    'Reg': row.Reg,
+    'Flight Service Type': row['Flight Service Type'],
+    'totalpax': row.totalpax,
+    'child': row.child,
+    'adult': row.adult,
+  }));
+
+  const ws = utils.json_to_sheet(exportData, { header });
+  const wb = utils.book_new();
+  utils.book_append_sheet(wb, ws, 'Load');
+
+  const timestamp = dayjs().format('YYYYMMDD_HHmmss');
+  const outputFilename = filename || `load_${timestamp}_${rows.length}.xlsx`;
   
   writeFile(wb, outputFilename);
 }

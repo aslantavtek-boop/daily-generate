@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react';
 import dayjs from 'dayjs';
 import { Flight, FlightGeneratorConfig, TimezoneMode, DistributionMode } from '../../types/flight';
 import { generateFlights, validateConfig } from '../../utils/generateFlights';
-import { exportDailyFlights, exportLinkedFlights, exportAutoLinkedFlights } from '../../utils/exporters';
+import { exportDailyFlights, exportLinkedFlights, exportAutoLinkedFlights, exportLoadExcel } from '../../utils/exporters';
 import { buildLinkedRowsFromDaily, DailyRow } from '../../utils/linkFromDaily';
 import { buildAutoLinkedRowsFromDaily, DailyRow as AutoDailyRow } from '../../utils/autoLinkFromDaily';
+import { buildLoadRows, DailyRow as LoadDailyRow } from '../../utils/buildLoadRows';
 
 const DEFAULT_AIRLINES = ['AJ', 'TK', 'PC', 'LH', 'SU', 'QR', 'FZ', 'W6'];
 const DEFAULT_REMOTE_STATIONS = ['BCN', 'IST', 'DOH', 'SAW', 'FRA', 'DXB', 'AMS', 'LHR', 'KWI', 'MUC', 'CDG'];
@@ -65,6 +66,13 @@ export default function FlightGenerator() {
   const [minGroundTimeForLink, setMinGroundTimeForLink] = useState<number>(30);
   const [seed, setSeed] = useState<string>('');
   const [previewLimit, setPreviewLimit] = useState<number>(1000);
+
+  // Load Excel state
+  const [loadMinTotalPax, setLoadMinTotalPax] = useState<number>(50);
+  const [loadMaxTotalPax, setLoadMaxTotalPax] = useState<number>(180);
+  const [loadChildRatioMin, setLoadChildRatioMin] = useState<number>(0);
+  const [loadChildRatioMax, setLoadChildRatioMax] = useState<number>(40);
+  const [loadDefaultFST, setLoadDefaultFST] = useState<string>('J');
 
   // API Post state
   const [apiEnabled, setApiEnabled] = useState<boolean>(false);
@@ -341,6 +349,61 @@ export default function FlightGenerator() {
       // Export
       exportAutoLinkedFlights(rows);
       alert(`Successfully exported ${rows.length} auto-linked rows!\n\n` + message);
+    } catch (error) {
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleExportLoad = () => {
+    if (flights.length === 0) {
+      alert('No data to export. Please generate flights first.');
+      return;
+    }
+
+    // Validate home airport
+    const home = homeAirport.trim().toUpperCase();
+    if (home.length !== 3) {
+      alert('Home airport must be exactly 3 letters (IATA code)');
+      return;
+    }
+
+    try {
+      // Convert flights to LoadDailyRow format
+      const dailyRows: LoadDailyRow[] = flights.map(f => ({
+        Airline: f.Airline,
+        'Operator Flight Number': f['Operator Flight Number'],
+        'Flight Suffix': f['Flight Suffix'],
+        Station: f.Station,
+        SDT: f.SDT,
+        REG: f.REG,
+        'Flight Service Type': f['Flight Service Type'],
+      }));
+
+      // Build load rows
+      const { rows, stats } = buildLoadRows(dailyRows, {
+        home,
+        minTotal: loadMinTotalPax,
+        maxTotal: loadMaxTotalPax,
+        childRatioMin: loadChildRatioMin,
+        childRatioMax: loadChildRatioMax,
+        defaultFST: loadDefaultFST,
+      });
+
+      // Show statistics
+      const message = [
+        `Total: ${stats.total} flights`,
+        stats.skipped > 0 ? `Skipped (invalid format): ${stats.skipped}` : null,
+        `Load rows: ${rows.length}`,
+      ].filter(Boolean).join('\n');
+
+      if (rows.length === 0) {
+        alert('No load rows could be generated.\n\n' + message);
+        return;
+      }
+
+      // Export
+      exportLoadExcel(rows);
+      alert(`Successfully exported ${rows.length} load rows!\n\n` + message);
     } catch (error) {
       alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -760,6 +823,80 @@ export default function FlightGenerator() {
             </div>
           </div>
 
+          {/* Load Excel Parameters */}
+          <div className="mb-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Load Excel Parameters
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Min Total Pax
+                </label>
+                <input
+                  type="number"
+                  value={loadMinTotalPax}
+                  onChange={(e) => setLoadMinTotalPax(parseInt(e.target.value) || 50)}
+                  min={1}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Max Total Pax
+                </label>
+                <input
+                  type="number"
+                  value={loadMaxTotalPax}
+                  onChange={(e) => setLoadMaxTotalPax(parseInt(e.target.value) || 180)}
+                  min={1}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Child Ratio Min %
+                </label>
+                <input
+                  type="number"
+                  value={loadChildRatioMin}
+                  onChange={(e) => setLoadChildRatioMin(parseInt(e.target.value) || 0)}
+                  min={0}
+                  max={100}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Child Ratio Max %
+                </label>
+                <input
+                  type="number"
+                  value={loadChildRatioMax}
+                  onChange={(e) => setLoadChildRatioMax(parseInt(e.target.value) || 40)}
+                  min={0}
+                  max={100}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-300 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Flight Service Type (default)
+              </label>
+              <select
+                value={loadDefaultFST}
+                onChange={(e) => setLoadDefaultFST(e.target.value)}
+                className="w-full md:w-1/4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                {DEFAULT_SERVICE_TYPES.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Used when Flight Service Type is not in Daily data</p>
+            </div>
+          </div>
+
           {/* API Post Section */}
           <div className="mb-6 border-t border-gray-200 dark:border-gray-700 pt-6">
             <div className="flex items-center mb-3">
@@ -853,6 +990,13 @@ export default function FlightGenerator() {
             >
               Download Auto Link (from Daily)
             </button>
+            <button
+              onClick={handleExportLoad}
+              disabled={flights.length === 0 || isPosting}
+              className="px-6 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
+            >
+              Download Load Excel (from Daily)
+            </button>
           </div>
           
           {flights.length > 0 && (
@@ -860,6 +1004,7 @@ export default function FlightGenerator() {
               <p>💡 <strong>Daily:</strong> Long format (one row per flight)</p>
               <p>💡 <strong>Link:</strong> Wide format (matched arrival-departure pairs)</p>
               <p>💡 <strong>Auto Link:</strong> Wide format (no matching, ARR/DEP separate rows)</p>
+              <p>💡 <strong>Load Excel:</strong> Pax data with random totalpax, child, adult counts</p>
             </div>
           )}
         </div>
