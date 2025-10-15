@@ -45,6 +45,7 @@ class SeededRandom {
   }
 }
 
+
 // Generate a random time in the given range with distribution mode
 function generateArrivalTime(
   start: dayjs.Dayjs,
@@ -102,6 +103,7 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
     flightNumberMax,
     remoteStations: rawRemoteStations,
     serviceTypes,
+    registrations,
     distributionMode,
     minGroundTime,
     maxGroundTime,
@@ -115,6 +117,10 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
 
   if (remoteStations.length === 0) {
     throw new Error('No valid remote stations available');
+  }
+
+  if (!registrations || registrations.length === 0) {
+    throw new Error('At least one registration must be provided');
   }
 
   // Initialize random number generator
@@ -131,7 +137,10 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
     const airline = rng.choice(airlines);
     const remoteStation = rng.choice(remoteStations);
     const serviceType = rng.choice(serviceTypes);
-    const flightNumber = rng.nextInt(flightNumberMin, flightNumberMax);
+    const arrivalFlightNumber = rng.nextInt(flightNumberMin, flightNumberMax - 1); // Leave room for +1
+    const departureFlightNumber = arrivalFlightNumber + 1; // DEP is ARR + 1
+    const registration = rng.choice(registrations);
+    const flightSuffix = 'O'; // Default suffix
     
     // Generate arrival time
     let arrivalTime: dayjs.Dayjs;
@@ -159,12 +168,26 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
       return date.format('DD/MM/YYYY HH:mm:ss');
     };
 
+    // Format: YYYYMMDD
+    const formatSDT = (date: dayjs.Dayjs): string => {
+      return date.format('YYYYMMDD');
+    };
+
+    // Format: HH:mm
+    const formatTime = (date: dayjs.Dayjs): string => {
+      return date.format('HH:mm');
+    };
+
     // Create ARR flight (XXX -> HOME)
     const arrFlight: Flight = {
       'Airline': airline,
-      'Operator Flight Number': flightNumber,
+      'Operator Flight Number': arrivalFlightNumber,
+      'Flight Suffix': flightSuffix,
       'Station': `${remoteStation}-${homeAirport}`,
       'STAD': formatDate(arrivalTime),
+      'SDT': formatSDT(arrivalTime),
+      'STA': formatTime(arrivalTime),
+      'REG': registration,
       'Flight Service Type': serviceType,
       _pairId: pairId,
       _legType: 'ARR',
@@ -174,9 +197,13 @@ export function generateFlights(config: FlightGeneratorConfig): Flight[] {
     // Create DEP flight (HOME -> XXX)
     const depFlight: Flight = {
       'Airline': airline,
-      'Operator Flight Number': flightNumber,
+      'Operator Flight Number': departureFlightNumber,
+      'Flight Suffix': flightSuffix,
       'Station': `${homeAirport}-${remoteStation}`,
       'STAD': formatDate(departureTime),
+      'SDT': formatSDT(departureTime),
+      'STD': formatTime(departureTime),
+      'REG': registration,
       'Flight Service Type': serviceType,
       _pairId: pairId,
       _legType: 'DEP',
@@ -229,6 +256,10 @@ export function validateConfig(config: Partial<FlightGeneratorConfig>): string[]
 
   if (!config.serviceTypes || config.serviceTypes.length === 0) {
     errors.push('At least one service type must be selected');
+  }
+
+  if (!config.registrations || config.registrations.length === 0) {
+    errors.push('At least one aircraft registration must be selected');
   }
 
   if (!config.minGroundTime || config.minGroundTime < 30) {

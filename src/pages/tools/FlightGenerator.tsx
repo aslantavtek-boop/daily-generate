@@ -1,12 +1,48 @@
 import { useState, useMemo } from 'react';
 import dayjs from 'dayjs';
-import { utils, writeFile } from 'xlsx';
 import { Flight, FlightGeneratorConfig, TimezoneMode, DistributionMode } from '../../types/flight';
 import { generateFlights, validateConfig } from '../../utils/generateFlights';
+import { exportDailyFlights, exportLinkedFlights, exportAutoLinkedFlights, exportLoadExcel } from '../../utils/exporters';
+import { buildLinkedRowsFromDaily, DailyRow } from '../../utils/linkFromDaily';
+import { buildAutoLinkedRowsFromDaily, DailyRow as AutoDailyRow } from '../../utils/autoLinkFromDaily';
+import { buildLoadRows, DailyRow as LoadDailyRow } from '../../utils/buildLoadRows';
 
 const DEFAULT_AIRLINES = ['AJ', 'TK', 'PC', 'LH', 'SU', 'QR', 'FZ', 'W6'];
 const DEFAULT_REMOTE_STATIONS = ['BCN', 'IST', 'DOH', 'SAW', 'FRA', 'DXB', 'AMS', 'LHR', 'KWI', 'MUC', 'CDG'];
 const DEFAULT_SERVICE_TYPES = ['J', 'D', 'C', 'P'];
+const DEFAULT_REGISTRATIONS = [
+  'TCOHE', 'TCOHF', 'TCLPT', 'TCTSM', 'TCLMD', 'TCRFU', 'TCMYA', 'TCLHG',
+  'TCMYB', 'TCLBC', 'TCMGR', 'TCLBP', 'TCRFT', 'TCOHD', 'TCOHC', 'TCMCU',
+  'TCLPS', 'TCOHA', 'TCISL', 'TCOHB', 'TCLBM', 'TCRFR', 'TCRFS', 'TCRFP',
+  'TCJMP', 'TCRFO', 'TCMCN', 'TCVEL', 'TCLHF', 'TCULE', 'TCLMC', 'TCCBA',
+  'TCLBV', 'TCRFN', 'TCMZS', 'TCMCM', 'TCEGG', 'TCMCO', 'TCLPR', 'TCMCZ',
+  'TCMGO', 'TCGRZ', 'TCMGP', 'TCANT', 'TCKMK', 'TCMNZ', 'TCMCP', 'TCLBU',
+  'TCLHE', 'TCLHD', 'TCJDR', 'TCMAK', 'TCKRZ', 'TCFYI', 'TCCRC', 'TCRFM',
+  'TCKRG', 'TCJOO', 'TCIST', 'TCATA', 'TCMRK', 'TCGPG', 'TCGPF', 'TCNBS',
+  'TCLHC', 'TCJTV', 'TCLHB', 'TCRFL', 'TCLPP', 'TCJOV', 'TCLPO', 'TCGRD',
+  'TCGRO', 'TCMZK', 'TCFUN', 'TCEIA', 'TCGKL', 'TCIHY', 'TCLON', 'TCRFK',
+  'TCLPG', 'TCMGK', 'TCGRC', 'TCJTY', 'TCKZU', 'TCHTN', 'TCERB', 'TCRSI',
+  'TCRFF', 'TCRFJ', 'TCMGL', 'TCLPM', 'TCMGN', 'TCGHL', 'TCRFI', 'TCRFE',
+  'TCLPL', 'TCMGT', 'TCRFD', 'TCJTT', 'TCLPK', 'TCDBA', 'TCJTS', 'TCSMP',
+  'TCGMB', 'TCLPN', 'TCGEH', 'TCJTU', 'TCRFG', 'TCRFH', 'TCLHA', 'TCFAA',
+  'TCSML', 'TCLPJ', 'TCLAC', 'TCTUM', 'TCGVN', 'TCEMR', 'TCREG', 'TCRMS',
+  'TCHKE', 'TCVLK', 'TCALN', 'TCVRG', 'TCTAR', 'TCBJ', 'TCLPI', 'TCKRF',
+  'TCHYH', 'TCLGZ', 'TCSRB', 'TCLGY', 'TCJKC', 'TCJKB', 'TCMGJ', 'TCZSZ',
+  'TCTIM', 'TCRFB', 'TCLGU', 'TCLGO', 'TCSTR', 'TCLLV', 'TCLPF', 'TCJFA',
+  'TCLPH', 'TCLLY', 'TCLLZ', 'TCSPZ', 'TCLPE', 'TCFHF', 'TCDBF', 'TCHSA',
+  'TCLLT', 'TCLGS', 'TCLGT', 'TCLGV', 'TCSMN', 'TCSPV', 'TCLGR', 'TCLGP',
+  'TCKRD', 'TCRFA', 'TCHZM', 'TCJKT', 'TCMZE', 'TCHOH', 'TCMAY', 'TCRFC',
+  'TCRDZ', 'TCTBR', 'TCHFZ', 'TCMLR', 'TCLKF', 'TCSPY', 'TCRDY', 'TCLOM',
+  'TCSRC', 'TCRDV', 'TCMGA', 'TCUNL', 'TCNYB', 'TCIMN', 'TCMER', 'TCJOY',
+  'TCLHO', 'TCRDO', 'TCLPD', 'TCHRK', 'TCGRK', 'TCAKD', 'TCHVS', 'TCGRJ',
+  'TCERM', 'TCARK', 'TCKYA', 'TCVHZ', 'TCRDM', 'TCRSH', 'TCLMT', 'TCGMA',
+  'TCLMB', 'TCCDY', 'TCCKD', 'TCLPC', 'TCGPE', 'TCHKT', 'TCGPD', 'TCGPC',
+  'TCGPA', 'TCCBK', 'TCDAP', 'TCRDK', 'TCSMK', 'TCLPB', 'TCRDN', 'TCCEM',
+  'TCLJS', 'TCLYL', 'TCCGZ', 'TCLUR', 'TCRDS', 'TCRDL', 'TCJCI', 'TCRDT',
+  'TCHDL', 'TCDTR', 'TCRDU', 'TCMGI', 'TCHZH', 'TCNYK', 'TCCMD', 'TCLMA',
+  'TCRDR', 'TCGLF', 'TCMYZ', 'TCMGH', 'TCRDP', 'TCLPA', 'TCJEJ', 'TCACA',
+  'TCATS', 'TCLTY', 'TCSPS', 'TCMKG'
+];
 
 export default function FlightGenerator() {
   // Form state
@@ -22,11 +58,21 @@ export default function FlightGenerator() {
   const [useCustomStations, setUseCustomStations] = useState<boolean>(false);
   const [customStations, setCustomStations] = useState<string>('');
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>(DEFAULT_SERVICE_TYPES);
+  const [selectedRegistrations, setSelectedRegistrations] = useState<string[]>(DEFAULT_REGISTRATIONS);
+  const [customRegistrations, setCustomRegistrations] = useState<string>('');
   const [distributionMode, setDistributionMode] = useState<DistributionMode>('Uniform');
   const [minGroundTime, setMinGroundTime] = useState<number>(30);
   const [maxGroundTime, setMaxGroundTime] = useState<number>(180);
+  const [minGroundTimeForLink, setMinGroundTimeForLink] = useState<number>(30);
   const [seed, setSeed] = useState<string>('');
   const [previewLimit, setPreviewLimit] = useState<number>(1000);
+
+  // Load Excel state
+  const [loadMinTotalPax, setLoadMinTotalPax] = useState<number>(50);
+  const [loadMaxTotalPax, setLoadMaxTotalPax] = useState<number>(180);
+  const [loadChildRatioMin, setLoadChildRatioMin] = useState<number>(0);
+  const [loadChildRatioMax, setLoadChildRatioMax] = useState<number>(40);
+  const [loadDefaultFST, setLoadDefaultFST] = useState<string>('J');
 
   // API Post state
   const [apiEnabled, setApiEnabled] = useState<boolean>(false);
@@ -68,6 +114,15 @@ export default function FlightGenerator() {
     }
     return DEFAULT_REMOTE_STATIONS;
   }, [useCustomStations, customStations]);
+
+  // Get registrations list (selected + custom)
+  const registrationsList = useMemo(() => {
+    const custom = customRegistrations
+      .split('\n')
+      .map(r => r.trim().toUpperCase())
+      .filter(r => r.length > 0);
+    return [...new Set([...selectedRegistrations, ...custom])];
+  }, [selectedRegistrations, customRegistrations]);
 
   // Filter and sort flights
   const filteredFlights = useMemo(() => {
@@ -146,6 +201,7 @@ export default function FlightGenerator() {
         flightNumberMax,
         remoteStations: remoteStationsList,
         serviceTypes: selectedServiceTypes,
+        registrations: registrationsList,
         distributionMode,
         minGroundTime,
         maxGroundTime,
@@ -175,29 +231,182 @@ export default function FlightGenerator() {
     }
   };
 
-  const handleExport = () => {
+  const handleExportDaily = () => {
     if (flights.length === 0) {
       alert('No data to export. Please generate flights first.');
       return;
     }
 
-    // Prepare data for Excel (exclude internal fields)
-    const exportData = flights.map(f => ({
-      'Airline': f.Airline,
-      'Operator Flight Number': f['Operator Flight Number'],
-      'Station': f.Station,
-      'STAD': f.STAD,
-      'Flight Service Type': f['Flight Service Type'],
-    }));
+    try {
+      exportDailyFlights(flights);
+      alert(`Successfully exported ${flights.length} flights!`);
+    } catch (error) {
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
-    const ws = utils.json_to_sheet(exportData);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, 'Flights');
+  const handleExportLink = () => {
+    if (flights.length === 0) {
+      alert('No data to export. Please generate flights first.');
+      return;
+    }
 
-    const timestamp = dayjs().format('YYYYMMDD_HHmmss');
-    const filename = `flights_${timestamp}_${flights.length}.xlsx`;
-    
-    writeFile(wb, filename);
+    // Validate home airport
+    const home = homeAirport.trim().toUpperCase();
+    if (home.length !== 3) {
+      alert('Home airport must be exactly 3 letters (IATA code)');
+      return;
+    }
+
+    try {
+      // Convert flights to DailyRow format
+      const dailyRows: DailyRow[] = flights.map(f => ({
+        Airline: f.Airline,
+        'Operator Flight Number': f['Operator Flight Number'],
+        'Flight Suffix': f['Flight Suffix'],
+        Station: f.Station,
+        SDT: f.SDT,
+        STA: f.STA,
+        STD: f.STD,
+        REG: f.REG,
+      }));
+
+      // Build linked rows
+      const { linked, stats } = buildLinkedRowsFromDaily(
+        dailyRows,
+        home,
+        minGroundTimeForLink
+      );
+
+      // Show warnings if any
+      if (stats.warnings.length > 0) {
+        console.warn('Link generation warnings:', stats.warnings);
+      }
+
+      // Show statistics
+      const message = [
+        `Matched pairs: ${stats.matched}`,
+        stats.skippedArr > 0 ? `Unmatched arrivals: ${stats.skippedArr}` : null,
+        stats.skippedDep > 0 ? `Unmatched departures: ${stats.skippedDep}` : null,
+        stats.warnings.length > 0 ? `Warnings: ${stats.warnings.length} (see console)` : null,
+      ].filter(Boolean).join('\n');
+
+      if (linked.length === 0) {
+        alert('No linked flights could be generated.\n\n' + message);
+        return;
+      }
+
+      // Export
+      exportLinkedFlights(linked);
+      alert(`Successfully exported ${linked.length} linked pairs!\n\n` + message);
+    } catch (error) {
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleExportAutoLink = () => {
+    if (flights.length === 0) {
+      alert('No data to export. Please generate flights first.');
+      return;
+    }
+
+    // Validate home airport
+    const home = homeAirport.trim().toUpperCase();
+    if (home.length !== 3) {
+      alert('Home airport must be exactly 3 letters (IATA code)');
+      return;
+    }
+
+    try {
+      // Convert flights to AutoDailyRow format
+      const dailyRows: AutoDailyRow[] = flights.map(f => ({
+        Airline: f.Airline,
+        'Operator Flight Number': f['Operator Flight Number'],
+        'Flight Suffix': f['Flight Suffix'],
+        Station: f.Station,
+        SDT: f.SDT,
+        STA: f.STA,
+        STD: f.STD,
+        REG: f.REG,
+      }));
+
+      // Build auto-linked rows (no matching, just format conversion)
+      const { rows, stats } = buildAutoLinkedRowsFromDaily(dailyRows, home);
+
+      // Show statistics
+      const message = [
+        `Total: ${stats.total} flights`,
+        `Arrivals: ${stats.arr}`,
+        `Departures: ${stats.dep}`,
+        stats.skipped > 0 ? `Skipped (invalid format): ${stats.skipped}` : null,
+      ].filter(Boolean).join('\n');
+
+      if (rows.length === 0) {
+        alert('No auto-linked flights could be generated.\n\n' + message);
+        return;
+      }
+
+      // Export
+      exportAutoLinkedFlights(rows);
+      alert(`Successfully exported ${rows.length} auto-linked rows!\n\n` + message);
+    } catch (error) {
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleExportLoad = () => {
+    if (flights.length === 0) {
+      alert('No data to export. Please generate flights first.');
+      return;
+    }
+
+    // Validate home airport
+    const home = homeAirport.trim().toUpperCase();
+    if (home.length !== 3) {
+      alert('Home airport must be exactly 3 letters (IATA code)');
+      return;
+    }
+
+    try {
+      // Convert flights to LoadDailyRow format
+      const dailyRows: LoadDailyRow[] = flights.map(f => ({
+        Airline: f.Airline,
+        'Operator Flight Number': f['Operator Flight Number'],
+        'Flight Suffix': f['Flight Suffix'],
+        Station: f.Station,
+        SDT: f.SDT,
+        REG: f.REG,
+        'Flight Service Type': f['Flight Service Type'],
+      }));
+
+      // Build load rows
+      const { rows, stats } = buildLoadRows(dailyRows, {
+        home,
+        minTotal: loadMinTotalPax,
+        maxTotal: loadMaxTotalPax,
+        childRatioMin: loadChildRatioMin,
+        childRatioMax: loadChildRatioMax,
+        defaultFST: loadDefaultFST,
+      });
+
+      // Show statistics
+      const message = [
+        `Total: ${stats.total} flights`,
+        stats.skipped > 0 ? `Skipped (invalid format): ${stats.skipped}` : null,
+        `Load rows: ${rows.length}`,
+      ].filter(Boolean).join('\n');
+
+      if (rows.length === 0) {
+        alert('No load rows could be generated.\n\n' + message);
+        return;
+      }
+
+      // Export
+      exportLoadExcel(rows);
+      alert(`Successfully exported ${rows.length} load rows!\n\n` + message);
+    } catch (error) {
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const postToAPI = async (flightsToPost: Flight[]) => {
@@ -268,6 +477,14 @@ export default function FlightGenerator() {
       prev.includes(serviceType)
         ? prev.filter(st => st !== serviceType)
         : [...prev, serviceType]
+    );
+  };
+
+  const toggleRegistration = (registration: string) => {
+    setSelectedRegistrations(prev =>
+      prev.includes(registration)
+        ? prev.filter(r => r !== registration)
+        : [...prev, registration]
     );
   };
 
@@ -491,6 +708,37 @@ export default function FlightGenerator() {
             </div>
           </div>
 
+          {/* Aircraft Registrations */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Aircraft Registrations (REG)</h3>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {DEFAULT_REGISTRATIONS.map(reg => (
+                <button
+                  key={reg}
+                  onClick={() => toggleRegistration(reg)}
+                  className={`px-3 py-1 rounded-md font-medium font-mono text-sm ${
+                    selectedRegistrations.includes(reg)
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {reg}
+                </button>
+              ))}
+            </div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Custom Registrations (one per line)
+            </label>
+            <textarea
+              value={customRegistrations}
+              onChange={(e) => setCustomRegistrations(e.target.value)}
+              placeholder="e.g.&#10;TC-ABC&#10;D-EFGH"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">Selected: {registrationsList.length} registrations</p>
+          </div>
+
           {/* Distribution & Ground Time */}
           <div className="mb-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -534,7 +782,7 @@ export default function FlightGenerator() {
           </div>
 
           {/* Seed & Preview Limit */}
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Seed (optional, for deterministic results)
@@ -559,6 +807,93 @@ export default function FlightGenerator() {
                 max={10000}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Min Ground for Link (min)
+              </label>
+              <input
+                type="number"
+                value={minGroundTimeForLink}
+                onChange={(e) => setMinGroundTimeForLink(parseInt(e.target.value) || 30)}
+                min={30}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+              <p className="text-xs text-gray-500 mt-1">For link matching only</p>
+            </div>
+          </div>
+
+          {/* Load Excel Parameters */}
+          <div className="mb-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Load Excel Parameters
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Min Total Pax
+                </label>
+                <input
+                  type="number"
+                  value={loadMinTotalPax}
+                  onChange={(e) => setLoadMinTotalPax(parseInt(e.target.value) || 50)}
+                  min={1}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Max Total Pax
+                </label>
+                <input
+                  type="number"
+                  value={loadMaxTotalPax}
+                  onChange={(e) => setLoadMaxTotalPax(parseInt(e.target.value) || 180)}
+                  min={1}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Child Ratio Min %
+                </label>
+                <input
+                  type="number"
+                  value={loadChildRatioMin}
+                  onChange={(e) => setLoadChildRatioMin(parseInt(e.target.value) || 0)}
+                  min={0}
+                  max={100}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Child Ratio Max %
+                </label>
+                <input
+                  type="number"
+                  value={loadChildRatioMax}
+                  onChange={(e) => setLoadChildRatioMax(parseInt(e.target.value) || 40)}
+                  min={0}
+                  max={100}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-300 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Flight Service Type (default)
+              </label>
+              <select
+                value={loadDefaultFST}
+                onChange={(e) => setLoadDefaultFST(e.target.value)}
+                className="w-full md:w-1/4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                {DEFAULT_SERVICE_TYPES.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Used when Flight Service Type is not in Daily data</p>
             </div>
           </div>
 
@@ -626,7 +961,7 @@ export default function FlightGenerator() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
             <button
               onClick={handleGenerate}
               disabled={isGenerating || isPosting}
@@ -635,13 +970,43 @@ export default function FlightGenerator() {
               {isGenerating ? 'Generating...' : 'Generate Preview'}
             </button>
             <button
-              onClick={handleExport}
+              onClick={handleExportDaily}
               disabled={flights.length === 0 || isPosting}
               className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
             >
-              Download Excel (.xlsx)
+              Download Daily (.xlsx)
+            </button>
+            <button
+              onClick={handleExportLink}
+              disabled={flights.length === 0 || isPosting}
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
+            >
+              Download Link (from Daily)
+            </button>
+            <button
+              onClick={handleExportAutoLink}
+              disabled={flights.length === 0 || isPosting}
+              className="px-6 py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
+            >
+              Download Auto Link (from Daily)
+            </button>
+            <button
+              onClick={handleExportLoad}
+              disabled={flights.length === 0 || isPosting}
+              className="px-6 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
+            >
+              Download Load Excel (from Daily)
             </button>
           </div>
+          
+          {flights.length > 0 && (
+            <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              <p>💡 <strong>Daily:</strong> Long format (one row per flight)</p>
+              <p>💡 <strong>Link:</strong> Wide format (matched arrival-departure pairs)</p>
+              <p>💡 <strong>Auto Link:</strong> Wide format (no matching, ARR/DEP separate rows)</p>
+              <p>💡 <strong>Load Excel:</strong> Pax data with random totalpax, child, adult counts</p>
+            </div>
+          )}
         </div>
 
         {/* Data Table */}
@@ -700,52 +1065,82 @@ export default function FlightGenerator() {
                   <tr>
                     <th
                       onClick={() => handleSort('Airline')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       Airline {sortColumn === 'Airline' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
                       onClick={() => handleSort('Operator Flight Number')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
-                      Flight Number {sortColumn === 'Operator Flight Number' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      FLN {sortColumn === 'Operator Flight Number' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('Flight Suffix')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      FLX {sortColumn === 'Flight Suffix' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
                       onClick={() => handleSort('Station')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       Station {sortColumn === 'Station' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
-                      onClick={() => handleSort('STAD')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => handleSort('SDT')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
-                      STAD {sortColumn === 'STAD' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      SDT {sortColumn === 'SDT' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      STA
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      STD
+                    </th>
+                    <th
+                      onClick={() => handleSort('REG')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      REG {sortColumn === 'REG' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
                       onClick={() => handleSort('Flight Service Type')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
-                      Service Type {sortColumn === 'Flight Service Type' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Service {sortColumn === 'Flight Service Type' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {paginatedFlights.map((flight, idx) => (
                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {flight.Airline}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {flight['Operator Flight Number']}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {flight['Flight Suffix'] || 'O'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {flight.Station}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {flight.STAD}
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {flight.SDT}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {flight.STA || '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {flight.STD || '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white font-mono">
+                        {flight.REG}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {flight['Flight Service Type']}
                       </td>
                     </tr>

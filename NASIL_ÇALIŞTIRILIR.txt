@@ -1,0 +1,61 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║       FLIGHT DATA GENERATOR - HIZLI BAŞLATMA                 ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+🚀 EN BASIT YÖNTEM:
+═══════════════════════
+
+   run.bat dosyasına ÇİFT TIKLAYIN!
+
+   Veya komut satırında:
+   > run.bat
+
+
+📋 NE YAPAR?
+═══════════════════════
+
+✓ Port 5173'ü kontrol eder
+✓ Port meşgulse otomatik temizler
+✓ node_modules yoksa yükler  
+✓ Geliştirme sunucusunu başlatır
+
+
+🌐 TARAYICIDA AÇIN:
+═══════════════════════
+
+   http://localhost:5173/tools/flight-generator
+
+
+⚡ ALTERNATİF SCRIPTLER:
+═══════════════════════
+
+1. run.bat            → En kolay (önerilen)
+2. start-dev.bat      → Klasik batch
+3. start-dev.ps1      → PowerShell (renkli çıktı)
+
+
+❓ SORUN ÇÖZME:
+═══════════════════════
+
+Port kullanımda hatası:
+  → CMD'yi yönetici olarak çalıştırın
+  → run.bat'ı tekrar çalıştırın
+
+Missing script hatası:
+  → npm install
+  → run.bat
+
+
+📖 DETAYLI KILAVUZ:
+═══════════════════════
+
+BAŞLATMA_KILAVUZU.md dosyasına bakın
+
+
+═══════════════════════════════════════════════════════════════
+
+İyi Çalışmalar! 🎉
+
