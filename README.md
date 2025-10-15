@@ -215,10 +215,67 @@ src/
 └── index.css                     # Tailwind directives
 ```
 
+## Deployment
+
+### 🚀 GitHub Pages Deployment (Windows)
+
+Proje GitHub Pages'e otomatik olarak deploy edilir. 3 farklı deployment scripti mevcuttur:
+
+#### 1. **deploy.bat** (Önerilen - İnteraktif)
+Tam kontrol için commit mesajı girme imkanı:
+```cmd
+deploy.bat
+```
+
+**Ne Yapar:**
+- ✅ Projeyi build eder (`npm run build`)
+- ✅ Git değişikliklerini ekler
+- ✅ Commit mesajı girmenizi ister (veya varsayılanı kullanır)
+- ✅ GitHub'a pushlar
+- ✅ GitHub Actions otomatik deploy eder
+
+#### 2. **deploy.ps1** (PowerShell - Renkli Çıktı)
+PowerShell ile gelişmiş kullanım:
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy.ps1
+```
+
+**Özellikler:**
+- 🎨 Renkli çıktı
+- 📊 Detaylı ilerleme göstergesi
+- ⚠️ Hata kontrolü
+- 🔗 GitHub Actions linki
+
+#### 3. **deploy-quick.bat** (Hızlı - Sessiz)
+Hızlı deployment, soru sormaz:
+```cmd
+deploy-quick.bat
+```
+
+**Kullanım Senaryosu:**
+- 🚀 Hızlı güncellemeler için
+- 🤖 Otomasyon için uygun
+- ⏱️ Varsayılan commit mesajı kullanır
+
+### 📡 GitHub Actions Workflow
+
+Proje otomatik olarak deploy edilir:
+- **Tetikleyici**: `feat/load-excel-from-daily` branch'ine push
+- **Build**: Node.js 20 ile otomatik build
+- **Deploy**: GitHub Pages'e otomatik deployment
+- **URL**: https://aslantavtek-boop.github.io/daily-generate/
+
+### 🔍 Deployment Durumu
+
+Deployment'ın durumunu kontrol etmek için:
+```
+https://github.com/aslantavtek-boop/daily-generate/actions
+```
+
 ## Development
 
 ### Branch
-Currently on: `feat/flight-data-generator`
+Currently on: `feat/load-excel-from-daily`
 
 ### Build
 ```bash
@@ -228,6 +285,11 @@ npm run build
 ### Linting
 ```bash
 npm run lint
+```
+
+### Local Preview (Production Build)
+```bash
+npm run preview
 ```
 
 ## Example Use Cases
