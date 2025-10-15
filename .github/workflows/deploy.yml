@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main
+      - master
       - feat/load-excel-from-daily
   workflow_dispatch:
 
