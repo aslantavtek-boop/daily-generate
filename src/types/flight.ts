@@ -3,10 +3,15 @@ export type DistributionMode = 'Uniform' | 'Peak';
 export type TimezoneMode = 'Local' | 'UTC';
 
 export interface Flight {
-  'Airline': string;
-  'Operator Flight Number': number;
-  'Station': string;
-  'STAD': string; // DD/MM/YYYY HH:mm:ss
+  'Airline': string; // FLC
+  'Operator Flight Number': number; // FLN
+  'Flight Suffix'?: string; // FLX (O if empty)
+  'Station': string; // ORG-DST
+  'STAD': string; // DD/MM/YYYY HH:mm:ss (deprecated, kept for compatibility)
+  'SDT': string; // YYYYMMDD
+  'STA'?: string; // HH:mm (for arrivals)
+  'STD'?: string; // HH:mm (for departures)
+  'REG': string; // Registration
   'Flight Service Type': string;
   _pairId: string;
   _legType: LegType;
@@ -37,6 +42,9 @@ export interface FlightGeneratorConfig {
   
   // Service Types
   serviceTypes: string[];
+  
+  // Registrations
+  registrations: string[]; // Aircraft registrations
   
   // Distribution
   distributionMode: DistributionMode;
